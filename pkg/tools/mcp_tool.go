@@ -134,6 +134,47 @@ func (t *MCPTool) Description() string {
 	return fmt.Sprintf("[MCP:%s] %s", t.serverName, desc)
 }
 
+// sanitizeSchema fixes common JSON Schema issues from MCP servers.
+// For example, some servers emit "required": true instead of an array.
+func sanitizeSchema(schema map[string]any) map[string]any {
+	// Fix "required" at the top level: must be an array of strings
+	if req, ok := schema["required"]; ok {
+		switch req.(type) {
+		case []any, []string:
+			// Already an array – keep it
+		case bool:
+			// "required: true/false" is invalid; derive from properties if true
+			if req.(bool) {
+				if props, ok := schema["properties"].(map[string]any); ok {
+					var names []string
+					for k := range props {
+						names = append(names, k)
+					}
+					schema["required"] = names
+				} else {
+					delete(schema, "required")
+				}
+			} else {
+				delete(schema, "required")
+			}
+		default:
+			// Unknown type – remove to avoid API errors
+			delete(schema, "required")
+		}
+	}
+
+	// Recursively sanitize nested properties
+	if props, ok := schema["properties"].(map[string]any); ok {
+		for key, val := range props {
+			if nested, ok := val.(map[string]any); ok {
+				props[key] = sanitizeSchema(nested)
+			}
+		}
+	}
+
+	return schema
+}
+
 // Parameters returns the tool parameters schema
 func (t *MCPTool) Parameters() map[string]any {
 	// The InputSchema is already a JSON Schema object
@@ -150,7 +191,7 @@ func (t *MCPTool) Parameters() map[string]any {
 
 	// Try direct conversion first (fast path)
 	if schemaMap, ok := schema.(map[string]any); ok {
-		return schemaMap
+		return sanitizeSchema(schemaMap)
 	}
 
 	// Handle json.RawMessage and []byte - unmarshal directly
@@ -164,7 +205,7 @@ func (t *MCPTool) Parameters() map[string]any {
 	if jsonData != nil {
 		var result map[string]any
 		if err := json.Unmarshal(jsonData, &result); err == nil {
-			return result
+			return sanitizeSchema(result)
 		}
 		// Fallback on error
 		return map[string]any{
@@ -196,7 +237,7 @@ func (t *MCPTool) Parameters() map[string]any {
 		}
 	}
 
-	return result
+	return sanitizeSchema(result)
 }
 
 // Execute executes the MCP tool
