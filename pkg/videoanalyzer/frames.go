@@ -67,7 +67,7 @@ func buildCombinedFilter(sceneThreshold float64, keyTimestamps []float64) string
 	// Fixed interval safety net: every 30s if nothing else selected
 	parts = append(parts, "isnan(prev_selected_t)+gte(t-prev_selected_t\\,30)")
 
-	selectExpr := "select='" + joinFilter(parts) + "'"
+	selectExpr := "select=" + joinFilter(parts)
 	return selectExpr + ",showinfo"
 }
 
@@ -117,6 +117,7 @@ func extractWithFilter(ctx context.Context, url string, cfg config.FrameConfig, 
 	// Start ffmpeg process, reading from yt-dlp stdout
 	ffmpeg := exec.CommandContext(ctx, tools.FfmpegPath,
 		"-i", "pipe:0",
+		"-an", // skip audio decoding
 		"-vf", fullVF,
 		"-vsync", "vfr",
 		"-f", "image2pipe",

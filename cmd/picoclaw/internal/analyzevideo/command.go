@@ -15,6 +15,7 @@ func NewAnalyzeVideoCommand() *cobra.Command {
 	var (
 		noTelegram     bool
 		noObsidian     bool
+		withFrames     bool
 		framesOnly     bool
 		sceneThreshold float64
 		maxFrames      int
@@ -23,12 +24,15 @@ func NewAnalyzeVideoCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "analyze-video URL",
-		Short: "Analyze a YouTube video: extract frames, get transcript, summarize via LLM",
-		Long: `Analyze a YouTube video by extracting key frames and transcript,
-running vision analysis on frames, synthesizing a structured summary,
-and delivering results to Telegram and/or Obsidian.
+		Short: "Analyze a YouTube video via transcript and LLM synthesis",
+		Long: `Analyze a YouTube video by extracting the transcript,
+synthesizing a structured summary via LLM, and delivering
+results to Telegram and/or Obsidian.
 
-Requires yt-dlp and ffmpeg to be installed.`,
+By default uses transcript only (fast, ~30s).
+Add --with-frames for visual frame analysis (slower, uses vision LLM).
+
+Requires yt-dlp (and ffmpeg if using --with-frames).`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if debug {
@@ -52,6 +56,7 @@ Requires yt-dlp and ffmpeg to be installed.`,
 			opts := videoanalyzer.Options{
 				NoTelegram: noTelegram,
 				NoObsidian: noObsidian,
+				WithFrames: withFrames || vaCfg.WithFrames, // CLI flag or config
 				FramesOnly: framesOnly,
 			}
 
@@ -67,7 +72,8 @@ Requires yt-dlp and ffmpeg to be installed.`,
 
 	cmd.Flags().BoolVar(&noTelegram, "no-telegram", false, "Skip Telegram delivery")
 	cmd.Flags().BoolVar(&noObsidian, "no-obsidian", false, "Skip Obsidian note creation")
-	cmd.Flags().BoolVar(&framesOnly, "frames-only", false, "Extract frames only (skip LLM analysis)")
+	cmd.Flags().BoolVar(&withFrames, "with-frames", false, "Enable frame extraction + vision analysis (slower)")
+	cmd.Flags().BoolVar(&framesOnly, "frames-only", false, "Extract frames only, no LLM (implies --with-frames)")
 	cmd.Flags().Float64Var(&sceneThreshold, "scene-threshold", 0, "Override scene detection threshold (0.0-1.0)")
 	cmd.Flags().IntVar(&maxFrames, "max-frames", 0, "Override maximum number of frames to extract")
 	cmd.Flags().BoolVarP(&debug, "debug", "d", false, "Enable debug logging")

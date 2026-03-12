@@ -93,6 +93,7 @@ type Config struct {
 
 // VideoAnalyzerConfig holds all settings for the analyze-video subcommand.
 type VideoAnalyzerConfig struct {
+	WithFrames bool                   `json:"with_frames"` // false = transcript only (fast), true = transcript + frames + vision
 	Providers  VideoAnalyzerProviders `json:"providers"`
 	Frames     FrameConfig            `json:"frames"`
 	Transcript TranscriptConfig       `json:"transcript"`

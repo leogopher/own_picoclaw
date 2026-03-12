@@ -14,9 +14,10 @@ import (
 
 // Options controls which outputs to produce.
 type Options struct {
-	NoTelegram bool
-	NoObsidian bool
-	FramesOnly bool
+	NoTelegram     bool
+	NoObsidian     bool
+	FramesOnly     bool
+	WithFrames     bool // enable frame extraction + vision (slow, off by default)
 }
 
 // Analyze is the top-level orchestrator for video analysis.
@@ -43,7 +44,7 @@ func Analyze(ctx context.Context, url string, cfg config.VideoAnalyzerConfig, fu
 	}
 
 	// Check external tool dependencies
-	if err := checkDeps(cfg.Tools); err != nil {
+	if err := checkDeps(cfg.Tools, opts.WithFrames || opts.FramesOnly); err != nil {
 		return nil, err
 	}
 
@@ -55,7 +56,7 @@ func Analyze(ctx context.Context, url string, cfg config.VideoAnalyzerConfig, fu
 	}
 	log.Info().Str("title", meta.Title).Float64("duration", meta.Duration).Msg("metadata loaded")
 
-	// Step 2: Extract transcript first (needed for smart frame selection)
+	// Step 2: Extract transcript
 	log.Info().Msg("extracting transcript")
 	transcript, err := GetTranscript(ctx, url, cfg.Transcript, cfg.Tools.YtdlpPath)
 	if err != nil {
@@ -65,43 +66,45 @@ func Analyze(ctx context.Context, url string, cfg config.VideoAnalyzerConfig, fu
 		log.Info().Int("lines", len(transcript)).Msg("transcript extracted")
 	}
 
-	// Step 3: Identify key moments from transcript via LLM
-	var keyTimestamps []float64
-	if len(transcript) > 0 {
-		log.Info().Msg("identifying key moments from transcript")
-		keyTimestamps, err = GetKeyMoments(ctx, transcript, meta, cfg.Providers.Synthesis)
+	// Step 3: Frame extraction (only with --with-frames flag)
+	var frames []Frame
+	if opts.WithFrames || opts.FramesOnly {
+		var keyTimestamps []float64
+		if len(transcript) > 0 {
+			log.Info().Msg("identifying key moments from transcript")
+			keyTimestamps, err = GetKeyMoments(ctx, transcript, meta, cfg.Providers.Synthesis)
+			if err != nil {
+				log.Warn().Err(err).Msg("key moments extraction failed (non-fatal)")
+			} else {
+				log.Info().Int("moments", len(keyTimestamps)).Msg("key moments identified")
+			}
+		}
+
+		log.Info().Int("key_timestamps", len(keyTimestamps)).Msg("extracting frames")
+		frames, err = ExtractFrames(ctx, url, cfg.Frames, cfg.Tools, keyTimestamps)
 		if err != nil {
-			log.Warn().Err(err).Msg("key moments extraction failed (non-fatal)")
-		} else {
-			log.Info().Int("moments", len(keyTimestamps)).Msg("key moments identified")
+			return nil, fmt.Errorf("frame extraction: %w", err)
+		}
+		log.Info().Int("frames", len(frames)).Msg("frames extracted")
+
+		if opts.FramesOnly {
+			return &AnalyzeResult{
+				Meta:       meta,
+				Transcript: transcript,
+				Frames:     frames,
+			}, nil
+		}
+
+		// Vision analysis on frames
+		log.Info().Int("frames", len(frames)).Msg("running vision analysis")
+		frames, err = AnalyzeFrames(ctx, frames, meta, cfg.Providers.Vision)
+		if err != nil {
+			return nil, fmt.Errorf("vision: %w", err)
 		}
 	}
 
-	// Step 4: Extract frames using combined filter (scene + key moments + interval)
-	log.Info().Int("key_timestamps", len(keyTimestamps)).Msg("extracting frames")
-	frames, err := ExtractFrames(ctx, url, cfg.Frames, cfg.Tools, keyTimestamps)
-	if err != nil {
-		return nil, fmt.Errorf("frame extraction: %w", err)
-	}
-	log.Info().Int("frames", len(frames)).Msg("frames extracted")
-
-	if opts.FramesOnly {
-		return &AnalyzeResult{
-			Meta:       meta,
-			Transcript: transcript,
-			Frames:     frames,
-		}, nil
-	}
-
-	// Step 3: Vision analysis
-	log.Info().Int("frames", len(frames)).Msg("running vision analysis")
-	frames, err = AnalyzeFrames(ctx, frames, meta, cfg.Providers.Vision)
-	if err != nil {
-		return nil, fmt.Errorf("vision: %w", err)
-	}
-
-	// Step 4: Synthesis
-	log.Info().Msg("synthesizing summary")
+	// Step 4: Synthesis (works with transcript only, or transcript + frames)
+	log.Info().Bool("has_transcript", len(transcript) > 0).Int("frames", len(frames)).Msg("synthesizing summary")
 	summary, err := Synthesize(ctx, meta, transcript, frames, cfg.Providers.Synthesis)
 	if err != nil {
 		return nil, fmt.Errorf("synthesis: %w", err)
@@ -171,12 +174,14 @@ func resolveProvider(p *config.VideoAnalyzerProvider, modelList []config.ModelCo
 	}
 }
 
-func checkDeps(tools config.VideoAnalyzerTools) error {
+func checkDeps(tools config.VideoAnalyzerTools, needFFmpeg bool) error {
 	if _, err := exec.LookPath(tools.YtdlpPath); err != nil {
 		return fmt.Errorf("yt-dlp not found at %q: %w", tools.YtdlpPath, err)
 	}
-	if _, err := exec.LookPath(tools.FfmpegPath); err != nil {
-		return fmt.Errorf("ffmpeg not found at %q: %w", tools.FfmpegPath, err)
+	if needFFmpeg {
+		if _, err := exec.LookPath(tools.FfmpegPath); err != nil {
+			return fmt.Errorf("ffmpeg not found at %q: %w", tools.FfmpegPath, err)
+		}
 	}
 	return nil
 }
