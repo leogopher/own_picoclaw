@@ -1,12 +1,12 @@
 ---
 name: video-analyzer
 description: Analyze YouTube videos — extract transcript, summarize key points via LLM, deliver structured digest. Use when user sends a YouTube link or asks to analyze/summarize a video.
-metadata: {"nanobot":{"emoji":"🎬","requires":{"bins":["picoclaw","yt-dlp"]}}}
+metadata: {"nanobot":{"emoji":"🎬","requires":{"bins":["yt-dlp"]}}}
 ---
 
 # Video Analyzer
 
-Analyze YouTube videos using the built-in `picoclaw analyze-video` command.
+Analyze YouTube videos using the built-in `analyze_video` tool.
 
 ## When to use
 
@@ -17,38 +17,36 @@ Use this skill immediately when:
 
 ## How to run
 
-Use the `exec` tool to run:
+Use the `analyze_video` tool (NOT exec, NOT Python scripts):
 
-```bash
-picoclaw analyze-video "VIDEO_URL"
+```json
+{"url": "VIDEO_URL"}
 ```
 
-This extracts the transcript, synthesizes a structured summary via LLM, and sends the result to Telegram automatically. The command takes ~30 seconds.
+This extracts the transcript, summarizes via LLM, and sends the digest to Telegram. Takes ~30 seconds.
 
-### Important
+### CRITICAL RULES
 
-- Always pass the full URL in quotes
-- Do NOT try to use Python, yt-dlp directly, or any other scripts — use `picoclaw analyze-video` only
-- The command handles everything: transcript extraction, LLM synthesis, Telegram delivery
-- After running, tell the user the analysis is complete and the digest was sent to Telegram
+- ALWAYS use the `analyze_video` tool — it is a native built-in tool
+- Do NOT use `exec` to run shell commands
+- Do NOT write Python scripts
+- Do NOT use yt-dlp or ffmpeg directly
+- The tool handles everything automatically
+- After the tool returns, tell the user the analysis is complete
 
-### Optional flags
+### Optional parameters
 
-- `--no-telegram` — skip Telegram delivery, print result to stdout only
-- `--no-obsidian` — skip Obsidian note creation
-- `--with-frames` — enable visual frame extraction + vision analysis (much slower, ~5-10 min)
-- `--debug` — enable debug logging
+- `with_frames` (bool) — enable visual frame extraction + vision analysis (much slower)
+- `no_telegram` (bool) — skip Telegram delivery
 
 ### Example
 
 User sends: `https://www.youtube.com/watch?v=dQw4w9WgXcQ`
 
-Run:
-```bash
-picoclaw analyze-video "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+Call the `analyze_video` tool with:
+```json
+{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}
 ```
-
-Then respond: "Video analyzed! A digest with the summary has been sent to Telegram."
 
 ## Supported URLs
 

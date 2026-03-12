@@ -89,6 +89,10 @@ func NewAgentInstance(
 		toolsRegistry.Register(execTool)
 	}
 
+	if cfg.Tools.IsToolEnabled("analyze_video") {
+		toolsRegistry.Register(tools.NewAnalyzeVideoTool(cfg.VideoAnalyzer, cfg))
+	}
+
 	if cfg.Tools.IsToolEnabled("edit_file") {
 		toolsRegistry.Register(tools.NewEditFileTool(workspace, restrict, allowWritePaths))
 	}

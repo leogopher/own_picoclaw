@@ -801,6 +801,7 @@ type ToolsConfig struct {
 	Skills          SkillsToolsConfig  `json:"skills"`
 	MediaCleanup    MediaCleanupConfig `json:"media_cleanup"`
 	MCP             MCPConfig          `json:"mcp"`
+	AnalyzeVideo    ToolConfig         `json:"analyze_video"                                            envPrefix:"PICOCLAW_TOOLS_ANALYZE_VIDEO_"`
 	AppendFile      ToolConfig         `json:"append_file"                                              envPrefix:"PICOCLAW_TOOLS_APPEND_FILE_"`
 	EditFile        ToolConfig         `json:"edit_file"                                                envPrefix:"PICOCLAW_TOOLS_EDIT_FILE_"`
 	FindSkills      ToolConfig         `json:"find_skills"                                              envPrefix:"PICOCLAW_TOOLS_FIND_SKILLS_"`
@@ -1073,6 +1074,8 @@ func MergeAPIKeys(apiKey string, apiKeys []string) []string {
 
 func (t *ToolsConfig) IsToolEnabled(name string) bool {
 	switch name {
+	case "analyze_video":
+		return t.AnalyzeVideo.Enabled
 	case "web":
 		return t.Web.Enabled
 	case "cron":

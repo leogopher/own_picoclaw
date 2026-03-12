@@ -476,6 +476,9 @@ func DefaultConfig() *Config {
 				},
 				Servers: map[string]MCPServerConfig{},
 			},
+			AnalyzeVideo: ToolConfig{
+				Enabled: true,
+			},
 			AppendFile: ToolConfig{
 				Enabled: true,
 			},
