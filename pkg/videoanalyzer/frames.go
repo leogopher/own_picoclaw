@@ -100,13 +100,19 @@ func extractWithFilter(ctx context.Context, url string, cfg config.FrameConfig, 
 
 	// Parse timestamps from ffmpeg stderr in background
 	timestamps := make(chan float64, cfg.MaxFrames)
-	go parseTimestamps(ffmpegStderr, timestamps)
+	go func() {
+		parseTimestamps(ffmpegStderr, timestamps)
+		close(timestamps)
+	}()
 
 	// Split JPEG frames from ffmpeg stdout
 	frames, err := splitJPEGs(ffmpegOut, cfg.MaxFrames)
 
-	// Assign timestamps to frames
-	close(timestamps) // parseTimestamps goroutine may still be running; drain is safe
+	// Clean up processes — this also closes stderr, unblocking parseTimestamps
+	_ = ffmpeg.Wait()
+	_ = ytdlp.Wait()
+
+	// Now safe to drain — parseTimestamps has exited and closed the channel
 	tsSlice := drainTimestamps(timestamps)
 	for i := range frames {
 		frames[i].Index = i
@@ -114,10 +120,6 @@ func extractWithFilter(ctx context.Context, url string, cfg config.FrameConfig, 
 			frames[i].Timestamp = tsSlice[i]
 		}
 	}
-
-	// Clean up processes
-	_ = ffmpeg.Wait()
-	_ = ytdlp.Wait()
 
 	if err != nil {
 		return nil, err
