@@ -532,13 +532,11 @@ func DefaultConfig() *Config {
 			Providers: VideoAnalyzerProviders{
 				Vision: VideoAnalyzerProvider{
 					Model:             "kimi-k2.5",
-					BaseURL:           "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
 					MaxFramesPerBatch: 4,
 					TimeoutSeconds:    60,
 				},
 				Synthesis: VideoAnalyzerProvider{
 					Model:          "qwen3.5-plus",
-					BaseURL:        "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
 					TimeoutSeconds: 120,
 				},
 			},

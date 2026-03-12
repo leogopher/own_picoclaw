@@ -55,7 +55,7 @@ Requires yt-dlp and ffmpeg to be installed.`,
 				FramesOnly: framesOnly,
 			}
 
-			result, err := videoanalyzer.Analyze(cmd.Context(), args[0], vaCfg, opts)
+			result, err := videoanalyzer.Analyze(cmd.Context(), args[0], vaCfg, cfg, opts)
 			if err != nil {
 				return err
 			}

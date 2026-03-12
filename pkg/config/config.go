@@ -130,16 +130,20 @@ type TranscriptConfig struct {
 	FallbackASR bool     `json:"fallback_asr"`
 }
 
-// VideoAnalyzerTelegram configures standalone Telegram delivery.
+// VideoAnalyzerTelegram configures Telegram delivery.
+// BotToken is optional — if empty, uses channels.telegram.token from the main config.
+// When Enabled is true, ChatID is required — the bot sends results only to that user.
 type VideoAnalyzerTelegram struct {
-	BotToken         string `json:"bot_token"          env:"PICOCLAW_VIDEO_ANALYZER_TELEGRAM_BOT_TOKEN"`
-	ChatID           string `json:"chat_id"            env:"PICOCLAW_VIDEO_ANALYZER_TELEGRAM_CHAT_ID"`
-	IncludeFrames    bool   `json:"include_frames"`
-	MaxFramesInDigest int   `json:"max_frames_in_digest"`
+	Enabled           bool   `json:"enabled"             env:"PICOCLAW_VIDEO_ANALYZER_TELEGRAM_ENABLED"`
+	BotToken          string `json:"bot_token,omitempty"  env:"PICOCLAW_VIDEO_ANALYZER_TELEGRAM_BOT_TOKEN"`
+	ChatID            string `json:"chat_id"             env:"PICOCLAW_VIDEO_ANALYZER_TELEGRAM_CHAT_ID"`
+	IncludeFrames     bool   `json:"include_frames"`
+	MaxFramesInDigest int    `json:"max_frames_in_digest"`
 }
 
 // ObsidianConfig configures markdown note output.
 type ObsidianConfig struct {
+	Enabled      bool   `json:"enabled"            env:"PICOCLAW_VIDEO_ANALYZER_OBSIDIAN_ENABLED"`
 	VaultPath    string `json:"vault_path"         env:"PICOCLAW_VIDEO_ANALYZER_OBSIDIAN_VAULT"`
 	VideoNoteDir string `json:"video_note_dir"`
 	AssetsDir    string `json:"assets_dir"`

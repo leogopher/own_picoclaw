@@ -494,18 +494,15 @@
     "port": 18790
   },
   "video_analyzer": {
+    "_comment": "Vision and synthesis models are resolved from model_list by model name. Set api_key/base_url here only to override.",
     "providers": {
       "vision": {
         "model": "kimi-k2.5",
-        "base_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
-        "api_key": "",
         "max_frames_per_batch": 4,
         "timeout_seconds": 60
       },
       "synthesis": {
         "model": "qwen3.5-plus",
-        "base_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
-        "api_key": "",
         "timeout_seconds": 120
       }
     },
@@ -520,12 +517,13 @@
       "fallback_asr": false
     },
     "telegram": {
-      "bot_token": "",
-      "chat_id": "",
+      "enabled": true,
+      "chat_id": "YOUR_TELEGRAM_USER_ID",
       "include_frames": true,
       "max_frames_in_digest": 5
     },
     "obsidian": {
+      "enabled": false,
       "vault_path": "",
       "video_note_dir": "Videos",
       "assets_dir": "assets/video-analyzer"

@@ -20,7 +20,23 @@ type Options struct {
 }
 
 // Analyze is the top-level orchestrator for video analysis.
-func Analyze(ctx context.Context, url string, cfg config.VideoAnalyzerConfig, opts Options) (*AnalyzeResult, error) {
+// fullCfg is the full picoclaw config, used to resolve provider credentials
+// from model_list and Telegram token from channels.telegram.
+func Analyze(ctx context.Context, url string, cfg config.VideoAnalyzerConfig, fullCfg *config.Config, opts Options) (*AnalyzeResult, error) {
+	if fullCfg != nil {
+		// Resolve vision provider from model_list if api_key/base_url not set
+		resolveProvider(&cfg.Providers.Vision, fullCfg.ModelList)
+		resolveProvider(&cfg.Providers.Synthesis, fullCfg.ModelList)
+
+		// Fall back to channels.telegram for bot token and chat_id
+		tg := fullCfg.Channels.Telegram
+		if cfg.Telegram.BotToken == "" {
+			cfg.Telegram.BotToken = tg.Token
+		}
+		if cfg.Telegram.ChatID == "" && len(tg.AllowFrom) > 0 {
+			cfg.Telegram.ChatID = tg.AllowFrom[0]
+		}
+	}
 	// Validate URL
 	if err := ValidateURL(url); err != nil {
 		return nil, err
@@ -104,7 +120,13 @@ func Analyze(ctx context.Context, url string, cfg config.VideoAnalyzerConfig, op
 	// Step 5: Deliver outputs in parallel
 	og, oCtx := errgroup.WithContext(ctx)
 
-	if !opts.NoTelegram && cfg.Telegram.BotToken != "" {
+	if !opts.NoTelegram && cfg.Telegram.Enabled {
+		if cfg.Telegram.ChatID == "" {
+			return nil, fmt.Errorf("telegram is enabled but chat_id is not set")
+		}
+		if cfg.Telegram.BotToken == "" {
+			return nil, fmt.Errorf("telegram is enabled but no bot token found (set video_analyzer.telegram.bot_token or channels.telegram.token)")
+		}
 		og.Go(func() error {
 			log.Info().Msg("delivering to Telegram")
 			if err := DeliverTelegram(oCtx, result, cfg.Telegram); err != nil {
@@ -115,7 +137,7 @@ func Analyze(ctx context.Context, url string, cfg config.VideoAnalyzerConfig, op
 		})
 	}
 
-	if !opts.NoObsidian && cfg.Obsidian.VaultPath != "" {
+	if !opts.NoObsidian && cfg.Obsidian.Enabled && cfg.Obsidian.VaultPath != "" {
 		og.Go(func() error {
 			log.Info().Msg("writing Obsidian note")
 			if err := WriteObsidian(result, cfg.Obsidian); err != nil {
@@ -131,6 +153,25 @@ func Analyze(ctx context.Context, url string, cfg config.VideoAnalyzerConfig, op
 	}
 
 	return result, nil
+}
+
+// resolveProvider fills in missing APIKey/BaseURL from model_list by matching
+// the provider's Model against model_name entries.
+func resolveProvider(p *config.VideoAnalyzerProvider, modelList []config.ModelConfig) {
+	if p.APIKey != "" && p.BaseURL != "" {
+		return // already fully configured
+	}
+	for _, m := range modelList {
+		if m.ModelName == p.Model {
+			if p.APIKey == "" {
+				p.APIKey = m.APIKey
+			}
+			if p.BaseURL == "" {
+				p.BaseURL = m.APIBase
+			}
+			return
+		}
+	}
 }
 
 func checkDeps(tools config.VideoAnalyzerTools) error {
