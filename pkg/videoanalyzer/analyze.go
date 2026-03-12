@@ -55,38 +55,35 @@ func Analyze(ctx context.Context, url string, cfg config.VideoAnalyzerConfig, fu
 	}
 	log.Info().Str("title", meta.Title).Float64("duration", meta.Duration).Msg("metadata loaded")
 
-	// Step 2: Extract transcript and frames in parallel
-	var transcript []TranscriptLine
-	var frames []Frame
-
-	g, gCtx := errgroup.WithContext(ctx)
-
-	g.Go(func() error {
-		log.Info().Msg("extracting transcript")
-		t, err := GetTranscript(gCtx, url, cfg.Transcript, cfg.Tools.YtdlpPath)
-		if err != nil {
-			log.Warn().Err(err).Msg("transcript extraction failed (non-fatal)")
-			return nil // transcript failure is non-fatal
-		}
-		transcript = t
-		log.Info().Int("lines", len(t)).Msg("transcript extracted")
-		return nil
-	})
-
-	g.Go(func() error {
-		log.Info().Msg("extracting frames")
-		f, err := ExtractFrames(gCtx, url, cfg.Frames, cfg.Tools)
-		if err != nil {
-			return fmt.Errorf("frame extraction: %w", err)
-		}
-		frames = f
-		log.Info().Int("frames", len(f)).Msg("frames extracted")
-		return nil
-	})
-
-	if err := g.Wait(); err != nil {
-		return nil, err
+	// Step 2: Extract transcript first (needed for smart frame selection)
+	log.Info().Msg("extracting transcript")
+	transcript, err := GetTranscript(ctx, url, cfg.Transcript, cfg.Tools.YtdlpPath)
+	if err != nil {
+		log.Warn().Err(err).Msg("transcript extraction failed (non-fatal)")
+		transcript = nil
+	} else {
+		log.Info().Int("lines", len(transcript)).Msg("transcript extracted")
 	}
+
+	// Step 3: Identify key moments from transcript via LLM
+	var keyTimestamps []float64
+	if len(transcript) > 0 {
+		log.Info().Msg("identifying key moments from transcript")
+		keyTimestamps, err = GetKeyMoments(ctx, transcript, meta, cfg.Providers.Synthesis)
+		if err != nil {
+			log.Warn().Err(err).Msg("key moments extraction failed (non-fatal)")
+		} else {
+			log.Info().Int("moments", len(keyTimestamps)).Msg("key moments identified")
+		}
+	}
+
+	// Step 4: Extract frames using combined filter (scene + key moments + interval)
+	log.Info().Int("key_timestamps", len(keyTimestamps)).Msg("extracting frames")
+	frames, err := ExtractFrames(ctx, url, cfg.Frames, cfg.Tools, keyTimestamps)
+	if err != nil {
+		return nil, fmt.Errorf("frame extraction: %w", err)
+	}
+	log.Info().Int("frames", len(frames)).Msg("frames extracted")
 
 	if opts.FramesOnly {
 		return &AnalyzeResult{

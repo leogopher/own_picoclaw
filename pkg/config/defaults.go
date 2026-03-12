@@ -532,8 +532,8 @@ func DefaultConfig() *Config {
 			Providers: VideoAnalyzerProviders{
 				Vision: VideoAnalyzerProvider{
 					Model:             "kimi-k2.5",
-					MaxFramesPerBatch: 4,
-					TimeoutSeconds:    60,
+					MaxFramesPerBatch: 2,
+					TimeoutSeconds:    180,
 				},
 				Synthesis: VideoAnalyzerProvider{
 					Model:          "qwen3.5-plus",
@@ -541,9 +541,9 @@ func DefaultConfig() *Config {
 				},
 			},
 			Frames: FrameConfig{
-				Resolution:     720,
+				Resolution:     480,
 				SceneThreshold: 0.3,
-				MaxFrames:      50,
+				MaxFrames:      40,
 				JPEGQuality:    85,
 			},
 			Transcript: TranscriptConfig{

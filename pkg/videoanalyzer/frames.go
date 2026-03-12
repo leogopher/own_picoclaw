@@ -21,20 +21,26 @@ var jpegSOI = []byte{0xFF, 0xD8}
 var jpegEOI = []byte{0xFF, 0xD9}
 
 // ExtractFrames streams video through yt-dlp | ffmpeg and extracts JPEG frames.
-func ExtractFrames(ctx context.Context, url string, cfg config.FrameConfig, tools config.VideoAnalyzerTools) ([]Frame, error) {
-	// First try scene detection
-	frames, err := extractWithFilter(ctx, url, cfg, tools, sceneFilter(cfg.SceneThreshold))
+// keyTimestamps are LLM-selected important moments from the transcript.
+// The filter combines: scene detection + key timestamps + fixed interval fallback.
+func ExtractFrames(ctx context.Context, url string, cfg config.FrameConfig, tools config.VideoAnalyzerTools, keyTimestamps []float64) ([]Frame, error) {
+	vf := buildCombinedFilter(cfg.SceneThreshold, keyTimestamps)
+
+	frames, err := extractWithFilter(ctx, url, cfg, tools, vf)
 	if err != nil {
 		return nil, err
 	}
 
-	// Fallback to fixed interval if scene detection yields too few frames
+	// Fallback to fixed interval if we got too few frames
 	if len(frames) < 3 {
-		frames, err = extractWithFilter(ctx, url, cfg, tools, intervalFilter())
+		frames, err = extractWithFilter(ctx, url, cfg, tools, "fps=1/10,showinfo")
 		if err != nil {
 			return nil, err
 		}
 	}
+
+	// Deduplicate frames that are too close together (within 2 seconds)
+	frames = deduplicateFrames(frames, 2.0)
 
 	if len(frames) > cfg.MaxFrames {
 		frames = frames[:cfg.MaxFrames]
@@ -43,12 +49,51 @@ func ExtractFrames(ctx context.Context, url string, cfg config.FrameConfig, tool
 	return frames, nil
 }
 
-func sceneFilter(threshold float64) string {
-	return fmt.Sprintf("select=gt(scene\\,%g),showinfo", threshold)
+// buildCombinedFilter creates an ffmpeg select filter that combines:
+// - Scene detection: gt(scene,threshold)
+// - Key timestamps: between(t,T-0.5,T+0.5) for each LLM-selected moment
+// - Fixed interval: isnan(prev_selected_t)+gte(t-prev_selected_t,30) as safety net
+func buildCombinedFilter(sceneThreshold float64, keyTimestamps []float64) string {
+	var parts []string
+
+	// Scene detection
+	parts = append(parts, fmt.Sprintf("gt(scene\\,%g)", sceneThreshold))
+
+	// Key timestamps from transcript analysis (±0.5s window)
+	for _, ts := range keyTimestamps {
+		parts = append(parts, fmt.Sprintf("between(t\\,%g\\,%g)", ts-0.5, ts+0.5))
+	}
+
+	// Fixed interval safety net: every 30s if nothing else selected
+	parts = append(parts, "isnan(prev_selected_t)+gte(t-prev_selected_t\\,30)")
+
+	selectExpr := "select='" + joinFilter(parts) + "'"
+	return selectExpr + ",showinfo"
 }
 
-func intervalFilter() string {
-	return "fps=1/10,showinfo"
+func joinFilter(parts []string) string {
+	if len(parts) == 0 {
+		return "1"
+	}
+	result := parts[0]
+	for _, p := range parts[1:] {
+		result += "+" + p
+	}
+	return result
+}
+
+// deduplicateFrames removes frames that are within minGap seconds of each other.
+func deduplicateFrames(frames []Frame, minGap float64) []Frame {
+	if len(frames) <= 1 {
+		return frames
+	}
+	result := []Frame{frames[0]}
+	for i := 1; i < len(frames); i++ {
+		if frames[i].Timestamp-result[len(result)-1].Timestamp >= minGap {
+			result = append(result, frames[i])
+		}
+	}
+	return result
 }
 
 func extractWithFilter(ctx context.Context, url string, cfg config.FrameConfig, tools config.VideoAnalyzerTools, vf string) ([]Frame, error) {
