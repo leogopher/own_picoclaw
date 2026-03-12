@@ -64,7 +64,9 @@ func GetKeyMoments(ctx context.Context, transcript []TranscriptLine, meta *Video
 		{Role: "user", Content: text},
 	}
 
-	resp, err := provider.Chat(ctx, messages, nil, cfg.Model, nil)
+	resp, err := provider.Chat(ctx, messages, nil, cfg.Model, map[string]any{
+		"response_format": map[string]string{"type": "json_object"},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("key moments API call: %w", err)
 	}

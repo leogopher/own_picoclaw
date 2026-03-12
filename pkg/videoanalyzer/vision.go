@@ -118,7 +118,9 @@ func analyzeBatch(ctx context.Context, frames []Frame, indices []int, meta *Vide
 		{Role: "user", Content: prompt.String(), Media: media},
 	}
 
-	resp, err := provider.Chat(ctx, messages, nil, model, nil)
+	resp, err := provider.Chat(ctx, messages, nil, model, map[string]any{
+		"response_format": map[string]string{"type": "json_object"},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("vision API call: %w", err)
 	}

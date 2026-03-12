@@ -45,7 +45,9 @@ func Synthesize(ctx context.Context, meta *VideoMeta, transcript []TranscriptLin
 		{Role: "user", Content: prompt},
 	}
 
-	resp, err := provider.Chat(ctx, messages, nil, cfg.Model, nil)
+	resp, err := provider.Chat(ctx, messages, nil, cfg.Model, map[string]any{
+		"response_format": map[string]string{"type": "json_object"},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("synthesis API call: %w", err)
 	}
@@ -159,9 +161,7 @@ func extractJSON(raw string) string {
 
 // repairJSON fixes common LLM JSON mistakes:
 // - trailing commas before } or ]
-// - unescaped newlines inside strings
 func repairJSON(s string) string {
-	// Remove trailing commas: ,\s*} or ,\s*]
 	var b strings.Builder
 	b.Grow(len(s))
 	inString := false

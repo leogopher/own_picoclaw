@@ -151,6 +151,12 @@ func (p *Provider) Chat(
 		}
 	}
 
+	// Response format: force structured JSON output when requested.
+	// Supported by OpenAI, Qwen/DashScope, DeepSeek, and most OpenAI-compat APIs.
+	if rf, ok := options["response_format"]; ok {
+		requestBody["response_format"] = rf
+	}
+
 	// Prompt caching: pass a stable cache key so OpenAI can bucket requests
 	// with the same key and reuse prefix KV cache across calls.
 	// The key is typically the agent ID — stable per agent, shared across requests.
