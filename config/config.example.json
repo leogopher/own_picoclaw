@@ -492,5 +492,47 @@
   "gateway": {
     "host": "127.0.0.1",
     "port": 18790
+  },
+  "video_analyzer": {
+    "providers": {
+      "vision": {
+        "model": "kimi-k2.5",
+        "base_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+        "api_key": "",
+        "max_frames_per_batch": 4,
+        "timeout_seconds": 60
+      },
+      "synthesis": {
+        "model": "qwen3.5-plus",
+        "base_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+        "api_key": "",
+        "timeout_seconds": 120
+      }
+    },
+    "frames": {
+      "resolution": 720,
+      "scene_threshold": 0.3,
+      "max_frames": 50,
+      "jpeg_quality": 85
+    },
+    "transcript": {
+      "languages": ["en", "ru"],
+      "fallback_asr": false
+    },
+    "telegram": {
+      "bot_token": "",
+      "chat_id": "",
+      "include_frames": true,
+      "max_frames_in_digest": 5
+    },
+    "obsidian": {
+      "vault_path": "",
+      "video_note_dir": "Videos",
+      "assets_dir": "assets/video-analyzer"
+    },
+    "tools": {
+      "ytdlp_path": "yt-dlp",
+      "ffmpeg_path": "ffmpeg"
+    }
   }
 }

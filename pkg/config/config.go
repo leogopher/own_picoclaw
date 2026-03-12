@@ -85,9 +85,70 @@ type Config struct {
 	Tools     ToolsConfig     `json:"tools"`
 	Heartbeat HeartbeatConfig `json:"heartbeat"`
 	Devices   DevicesConfig   `json:"devices"`
-	Voice     VoiceConfig     `json:"voice"`
+	Voice         VoiceConfig         `json:"voice"`
+	VideoAnalyzer VideoAnalyzerConfig `json:"video_analyzer,omitempty"`
 	// BuildInfo contains build-time version information
 	BuildInfo BuildInfo `json:"build_info,omitempty"`
+}
+
+// VideoAnalyzerConfig holds all settings for the analyze-video subcommand.
+type VideoAnalyzerConfig struct {
+	Providers  VideoAnalyzerProviders `json:"providers"`
+	Frames     FrameConfig            `json:"frames"`
+	Transcript TranscriptConfig       `json:"transcript"`
+	Telegram   VideoAnalyzerTelegram  `json:"telegram"`
+	Obsidian   ObsidianConfig         `json:"obsidian"`
+	Tools      VideoAnalyzerTools     `json:"tools"`
+}
+
+// VideoAnalyzerProviders configures vision and synthesis LLM providers.
+type VideoAnalyzerProviders struct {
+	Vision    VideoAnalyzerProvider `json:"vision"    envPrefix:"PICOCLAW_VIDEO_ANALYZER_VISION_"`
+	Synthesis VideoAnalyzerProvider `json:"synthesis"  envPrefix:"PICOCLAW_VIDEO_ANALYZER_SYNTHESIS_"`
+}
+
+// VideoAnalyzerProvider configures a single LLM endpoint.
+type VideoAnalyzerProvider struct {
+	Model             string `json:"model"`
+	BaseURL           string `json:"base_url"                       env:"BASE_URL"`
+	APIKey            string `json:"api_key"                        env:"API_KEY"`
+	MaxFramesPerBatch int    `json:"max_frames_per_batch,omitempty"`
+	TimeoutSeconds    int    `json:"timeout_seconds"`
+}
+
+// FrameConfig controls video frame extraction.
+type FrameConfig struct {
+	Resolution     int     `json:"resolution"`
+	SceneThreshold float64 `json:"scene_threshold"`
+	MaxFrames      int     `json:"max_frames"`
+	JPEGQuality    int     `json:"jpeg_quality"`
+}
+
+// TranscriptConfig controls subtitle extraction.
+type TranscriptConfig struct {
+	Languages   []string `json:"languages"`
+	FallbackASR bool     `json:"fallback_asr"`
+}
+
+// VideoAnalyzerTelegram configures standalone Telegram delivery.
+type VideoAnalyzerTelegram struct {
+	BotToken         string `json:"bot_token"          env:"PICOCLAW_VIDEO_ANALYZER_TELEGRAM_BOT_TOKEN"`
+	ChatID           string `json:"chat_id"            env:"PICOCLAW_VIDEO_ANALYZER_TELEGRAM_CHAT_ID"`
+	IncludeFrames    bool   `json:"include_frames"`
+	MaxFramesInDigest int   `json:"max_frames_in_digest"`
+}
+
+// ObsidianConfig configures markdown note output.
+type ObsidianConfig struct {
+	VaultPath    string `json:"vault_path"         env:"PICOCLAW_VIDEO_ANALYZER_OBSIDIAN_VAULT"`
+	VideoNoteDir string `json:"video_note_dir"`
+	AssetsDir    string `json:"assets_dir"`
+}
+
+// VideoAnalyzerTools configures external tool paths.
+type VideoAnalyzerTools struct {
+	YtdlpPath  string `json:"ytdlp_path"`
+	FfmpegPath string `json:"ffmpeg_path"`
 }
 
 // BuildInfo contains build-time version information

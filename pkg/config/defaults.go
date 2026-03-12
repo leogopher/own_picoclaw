@@ -528,6 +528,42 @@ func DefaultConfig() *Config {
 		Voice: VoiceConfig{
 			EchoTranscription: false,
 		},
+		VideoAnalyzer: VideoAnalyzerConfig{
+			Providers: VideoAnalyzerProviders{
+				Vision: VideoAnalyzerProvider{
+					Model:             "kimi-k2.5",
+					BaseURL:           "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+					MaxFramesPerBatch: 4,
+					TimeoutSeconds:    60,
+				},
+				Synthesis: VideoAnalyzerProvider{
+					Model:          "qwen3.5-plus",
+					BaseURL:        "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+					TimeoutSeconds: 120,
+				},
+			},
+			Frames: FrameConfig{
+				Resolution:     720,
+				SceneThreshold: 0.3,
+				MaxFrames:      50,
+				JPEGQuality:    85,
+			},
+			Transcript: TranscriptConfig{
+				Languages: []string{"en", "ru"},
+			},
+			Telegram: VideoAnalyzerTelegram{
+				IncludeFrames:     true,
+				MaxFramesInDigest: 5,
+			},
+			Obsidian: ObsidianConfig{
+				VideoNoteDir: "Videos",
+				AssetsDir:    "assets/video-analyzer",
+			},
+			Tools: VideoAnalyzerTools{
+				YtdlpPath:  "yt-dlp",
+				FfmpegPath: "ffmpeg",
+			},
+		},
 		BuildInfo: BuildInfo{
 			Version:   Version,
 			GitCommit: GitCommit,
