@@ -124,16 +124,14 @@ func analyzeBatch(ctx context.Context, frames []Frame, indices []int, meta *Vide
 	}
 
 	// Parse JSON response
-	content := strings.TrimSpace(resp.Content)
-	// Strip markdown fences if present
-	content = strings.TrimPrefix(content, "```json")
-	content = strings.TrimPrefix(content, "```")
-	content = strings.TrimSuffix(content, "```")
-	content = strings.TrimSpace(content)
+	content := extractJSON(resp.Content)
 
 	var analyses []frameAnalysis
 	if err := json.Unmarshal([]byte(content), &analyses); err != nil {
-		return nil, fmt.Errorf("parsing vision response: %w (content: %.200s)", err, content)
+		repaired := repairJSON(content)
+		if err2 := json.Unmarshal([]byte(repaired), &analyses); err2 != nil {
+			return nil, fmt.Errorf("parsing vision response: %w (content: %.200s)", err, content)
+		}
 	}
 
 	return analyses, nil

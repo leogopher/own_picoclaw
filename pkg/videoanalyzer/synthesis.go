@@ -50,15 +50,15 @@ func Synthesize(ctx context.Context, meta *VideoMeta, transcript []TranscriptLin
 		return nil, fmt.Errorf("synthesis API call: %w", err)
 	}
 
-	content := strings.TrimSpace(resp.Content)
-	content = strings.TrimPrefix(content, "```json")
-	content = strings.TrimPrefix(content, "```")
-	content = strings.TrimSuffix(content, "```")
-	content = strings.TrimSpace(content)
+	content := extractJSON(resp.Content)
 
 	var summary VideoSummary
 	if err := json.Unmarshal([]byte(content), &summary); err != nil {
-		return nil, fmt.Errorf("parsing synthesis response: %w (content: %.200s)", err, content)
+		// Try to repair common LLM JSON issues and retry
+		repaired := repairJSON(content)
+		if err2 := json.Unmarshal([]byte(repaired), &summary); err2 != nil {
+			return nil, fmt.Errorf("parsing synthesis response: %w (content: %.200s)", err, content)
+		}
 	}
 
 	return &summary, nil
@@ -113,6 +113,89 @@ func buildSynthesisPrompt(meta *VideoMeta, transcript []TranscriptLine, frames [
 			b.WriteString(fmt.Sprintf(" Text: %q", frame.KeyText))
 		}
 		b.WriteString("\n")
+	}
+
+	return b.String()
+}
+
+// extractJSON finds the outermost JSON object in LLM output,
+// stripping markdown fences and surrounding text.
+func extractJSON(raw string) string {
+	s := strings.TrimSpace(raw)
+
+	// Strip markdown code fences
+	s = strings.TrimPrefix(s, "```json")
+	s = strings.TrimPrefix(s, "```")
+	s = strings.TrimSuffix(s, "```")
+	s = strings.TrimSpace(s)
+
+	// Find the outermost JSON structure: { ... } or [ ... ]
+	objStart := strings.Index(s, "{")
+	arrStart := strings.Index(s, "[")
+
+	// Pick whichever comes first
+	start := objStart
+	openChar, closeChar := byte('{'), byte('}')
+	if arrStart >= 0 && (objStart < 0 || arrStart < objStart) {
+		start = arrStart
+		openChar, closeChar = '[', ']'
+	}
+	if start < 0 {
+		return s
+	}
+
+	var end int
+	if closeChar == '}' {
+		end = strings.LastIndex(s, "}")
+	} else {
+		end = strings.LastIndex(s, "]")
+	}
+	_ = openChar // used for clarity
+	if end < 0 || end <= start {
+		return s
+	}
+	return s[start : end+1]
+}
+
+// repairJSON fixes common LLM JSON mistakes:
+// - trailing commas before } or ]
+// - unescaped newlines inside strings
+func repairJSON(s string) string {
+	// Remove trailing commas: ,\s*} or ,\s*]
+	var b strings.Builder
+	b.Grow(len(s))
+	inString := false
+	escaped := false
+
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if escaped {
+			b.WriteByte(c)
+			escaped = false
+			continue
+		}
+		if c == '\\' && inString {
+			b.WriteByte(c)
+			escaped = true
+			continue
+		}
+		if c == '"' {
+			inString = !inString
+			b.WriteByte(c)
+			continue
+		}
+		if !inString && c == ',' {
+			// Look ahead: skip whitespace, check if next non-ws is } or ]
+			j := i + 1
+			for j < len(s) && (s[j] == ' ' || s[j] == '\t' || s[j] == '\n' || s[j] == '\r') {
+				j++
+			}
+			if j < len(s) && (s[j] == '}' || s[j] == ']') {
+				// Trailing comma — skip it
+				continue
+			}
+		}
+		b.WriteByte(c)
 	}
 
 	return b.String()

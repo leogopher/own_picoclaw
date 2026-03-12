@@ -55,6 +55,71 @@ func TestBuildSynthesisPrompt_TranscriptTruncation(t *testing.T) {
 	assert.Contains(t, prompt, "[... transcript truncated ...]")
 }
 
+func TestExtractJSON(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"clean", `{"a":1}`, `{"a":1}`},
+		{"markdown fences", "```json\n{\"a\":1}\n```", `{"a":1}`},
+		{"surrounding text", "Here is the JSON:\n{\"a\":1}\nDone!", `{"a":1}`},
+		{"nested braces", `{"a":{"b":2}}`, `{"a":{"b":2}}`},
+		{"array input", `[{"a":1}]`, `[{"a":1}]`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractJSON(tt.input)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestRepairJSON(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			"trailing comma in object",
+			`{"a": 1, "b": 2,}`,
+			`{"a": 1, "b": 2}`,
+		},
+		{
+			"trailing comma in array",
+			`[1, 2, 3,]`,
+			`[1, 2, 3]`,
+		},
+		{
+			"trailing comma with whitespace",
+			"{\"a\": 1,\n  }",
+			"{\"a\": 1\n  }",
+		},
+		{
+			"no trailing comma",
+			`{"a": 1, "b": 2}`,
+			`{"a": 1, "b": 2}`,
+		},
+		{
+			"comma inside string preserved",
+			`{"a": "hello, world"}`,
+			`{"a": "hello, world"}`,
+		},
+		{
+			"nested trailing commas",
+			`{"a": [1, 2,], "b": {"c": 3,},}`,
+			`{"a": [1, 2], "b": {"c": 3}}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := repairJSON(tt.input)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestFormatTranscript(t *testing.T) {
 	lines := []TranscriptLine{
 		{Start: 0, Duration: 5, Text: "Hello"},

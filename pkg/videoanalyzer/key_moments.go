@@ -69,15 +69,14 @@ func GetKeyMoments(ctx context.Context, transcript []TranscriptLine, meta *Video
 		return nil, fmt.Errorf("key moments API call: %w", err)
 	}
 
-	content := strings.TrimSpace(resp.Content)
-	content = strings.TrimPrefix(content, "```json")
-	content = strings.TrimPrefix(content, "```")
-	content = strings.TrimSuffix(content, "```")
-	content = strings.TrimSpace(content)
+	content := extractJSON(resp.Content)
 
 	var moments []keyMoment
 	if err := json.Unmarshal([]byte(content), &moments); err != nil {
-		return nil, fmt.Errorf("parsing key moments: %w (content: %.200s)", err, content)
+		repaired := repairJSON(content)
+		if err2 := json.Unmarshal([]byte(repaired), &moments); err2 != nil {
+			return nil, fmt.Errorf("parsing key moments: %w (content: %.200s)", err, content)
+		}
 	}
 
 	timestamps := make([]float64, 0, len(moments))
